@@ -1,0 +1,52 @@
+name: Build Twin Locks
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [TwinLocks-project.zip, .github/workflows/build-twinlocks.yml]
+permissions:
+  contents: read
+jobs:
+  iphone:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: unzip -q TwinLocks-project.zip -d coop
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/*.test.mjs
+        working-directory: coop
+      - run: bash build-ios.sh
+        working-directory: coop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinLocks-iPhone
+          path: coop/build/ios/TwinLocks-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: unzip -q TwinLocks-project.zip -d coop
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - run: python3 prepare-android.py
+        working-directory: coop
+      - run: gradle assembleDebug --no-daemon
+        working-directory: coop/build/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinLocks-Android
+          path: coop/build/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
